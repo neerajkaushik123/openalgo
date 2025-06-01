@@ -70,8 +70,14 @@
                         <tr class="hover">
                             <td class="font-medium">{{ holding.symbol }}</td>
                             <td>
-                                <span class="badge badge-{{ holding.exchange.lower() }}">
-                                    {{ holding.exchange }}
+                                {% set exchange_colors = {
+                                    'NSE': 'badge-accent',
+                                    'BSE': 'badge-neutral',
+                                    'NFO': 'badge-secondary',
+                                    'MCX': 'badge-primary'
+                                } %}
+                                <span class="badge {{ exchange_colors.get(holding.exchange, 'badge-ghost') }}">
+                                    {{ holding.exchange if holding.exchange else 'N/A' }}
                                 </span>
                             </td>
                             <td>{{ holding.quantity }}</td>

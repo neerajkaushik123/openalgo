@@ -8,6 +8,7 @@ import traceback
 
 from .account_schema import HoldingsSchema
 from services.holdings_service import get_holdings
+from services.history_service import get_history
 
 API_RATE_LIMIT = os.getenv("API_RATE_LIMIT", "10 per second")
 api = Namespace('holdings', description='Holdings API')
@@ -47,3 +48,6 @@ class Holdings(Resource):
                 'status': 'error',
                 'message': 'An unexpected error occurred'
             }), 500)
+
+
+

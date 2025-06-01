@@ -7,6 +7,7 @@ from services.close_position_service import close_position
 import logging
 import csv
 import io
+from services.holdings_service import analyze_holdings
 
 logger = logging.getLogger(__name__)
 
@@ -275,7 +276,13 @@ def holdings():
     portfolio_stats = calculate_portfolio_statistics(holdings_data)
     holdings_data = transform_holdings_data(holdings_data)
     
-    return render_template('holdings.html', holdings_data=holdings_data, portfolio_stats=portfolio_stats)
+    # Add portfolio analysis
+    analysis = analyze_holdings(holdings_data)
+    
+    return render_template('holdings.html', 
+                         holdings_data=holdings_data, 
+                         portfolio_stats=portfolio_stats,
+                         analysis=analysis.get('data', {}) if analysis['status'] == 'success' else {})
 
 @orders_bp.route('/orderbook/export')
 @check_session_validity

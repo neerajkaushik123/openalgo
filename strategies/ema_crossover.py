@@ -6,8 +6,7 @@ import threading
 from datetime import datetime, timedelta
 
 # Get API key from openalgo portal
-api_key = 'your-openalgo-api-key'
-
+api_key = '92fbae88ad9c469aa53b96c4f1e0b2db3341c06bc6c80303092687fc78741abe'
 
 # Set the strategy details and trading parameters
 strategy = "EMA Crossover Python"
@@ -128,7 +127,7 @@ def ema_strategy():
                 print("Sell Order Response:", response)
 
             # Log strategy information
-            print("\nStrategy Status:")
+            print(f"\nStrategy Status: {time.strftime("%Y-%m-%d %H:%M:%S")}")
             print("-" * 50)
             print(f"Position: {position}")
             print(f"LTP: {df['close'].iloc[-1]}")
@@ -144,7 +143,7 @@ def ema_strategy():
             continue
 
         # Wait before the next cycle
-        time.sleep(15)
+        time.sleep(1)
 
 if __name__ == "__main__":
     print(f"Starting {fast_period}/{slow_period} EMA Crossover Strategy...")

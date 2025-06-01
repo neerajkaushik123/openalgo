@@ -273,7 +273,7 @@ def map_portfolio_data(portfolio_data):
 
 
 def calculate_portfolio_statistics(holdings_data):
-
+    print(holdings_data)
     if holdings_data['totalholding'] is None:
         totalholdingvalue = 0
         totalinvvalue = 0

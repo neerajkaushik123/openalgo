@@ -1,12 +1,13 @@
-from openalgo import api
+from openalgo import api,Strategy
 import pandas as pd
 import numpy as np
 import time
 import threading
 from datetime import datetime, timedelta
 
+
 # Get API key from openalgo portal
-api_key = 'your-openalgo-api-key'
+api_key = '92fbae88ad9c469aa53b96c4f1e0b2db3341c06bc6c80303092687fc78741abe'
 
 # Set the strategy details and trading parameters
 strategy = "Supertrend Python"
@@ -19,8 +20,11 @@ quantity = 1
 atr_period = 5
 atr_multiplier = 1.0
 
-# Set the API Key
+
+
 client = api(api_key=api_key, host='http://127.0.0.1:5000')
+
+#client.strategyorder("RELIANCE", "BUY")
 
 def Supertrend(df, atr_period, multiplier):
     """
@@ -156,12 +160,13 @@ def supertrend_strategy():
             print(f"Buy Signal: {longentry}")
             print(f"Sell Signal: {shortentry}")
             print("-" * 50)
-
+            
+            
         except Exception as e:
             print(f"Error in strategy: {str(e)}")
             time.sleep(15)
             continue
-
+        # Log the current time for the strategy cycle
         # Wait before the next cycle
         time.sleep(15)
 

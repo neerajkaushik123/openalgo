@@ -26,7 +26,8 @@ def get_api_response(endpoint, auth, method="GET", payload=''):
     }
     
     url = f"https://apiconnect.angelbroking.com{endpoint}"
-    
+    print(f"Making {method} request to {url} with headers: {headers} and payload: {payload}")
+
     if method == "GET":
         response = client.get(url, headers=headers)
     elif method == "POST":
@@ -36,6 +37,7 @@ def get_api_response(endpoint, auth, method="GET", payload=''):
     
     # Add status attribute for compatibility with the existing codebase
     response.status = response.status_code
+    print(f"Response Status: {response.status} {response.text}")
     
     return json.loads(response.text)
 
@@ -56,7 +58,7 @@ def get_open_position(tradingsymbol, exchange, producttype,auth):
     tradingsymbol = get_br_symbol(tradingsymbol,exchange)
     positions_data = get_positions(auth)
 
-    print(positions_data)
+    # print(positions_data)
 
     net_qty = '0'
 

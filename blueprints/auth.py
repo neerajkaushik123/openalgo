@@ -2,11 +2,12 @@ from flask import Blueprint, request, redirect, url_for, render_template, sessio
 from limiter import limiter  # Import the limiter instance
 from extensions import socketio
 import os
-from database.auth_db import upsert_auth
+from database.auth_db import upsert_auth, get_user, update_password, update_broker
 from database.user_db import authenticate_user, User, db_session, find_user_by_username, find_user_by_email  # Import the function
 import re
 from utils.session import check_session_validity
 import secrets
+import logging
 
 # Access environment variables
 LOGIN_RATE_LIMIT_MIN = os.getenv("LOGIN_RATE_LIMIT_MIN", "5 per minute")
@@ -196,3 +197,49 @@ def logout():
 
     # Redirect to login page after logout
     return redirect(url_for('auth.login'))
+
+# Get list of available brokers
+def get_available_brokers():
+    broker_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'broker')
+    return [d for d in os.listdir(broker_dir) 
+            if os.path.isdir(os.path.join(broker_dir, d)) 
+            and not d.startswith('__')]
+
+@auth_bp.route('/profile')
+@check_session_validity
+def profile():
+    username = session.get('user')
+    if not username:
+        return redirect(url_for('auth.login'))
+        
+    user = get_user(username)
+    if not user:
+        return redirect(url_for('auth.login'))
+        
+    return render_template('profile.html',
+                         username=username,
+                         available_brokers=get_available_brokers(),
+                         selected_broker=session.get('broker'))
+
+@auth_bp.route('/update_broker', methods=['POST'])
+@check_session_validity
+def update_broker():
+    username = session.get('user')
+    if not username:
+        return redirect(url_for('auth.login'))
+        
+    broker = request.form.get('broker')
+    if not broker:
+        flash('Please select a broker', 'error')
+        return redirect(url_for('auth.profile'))
+        
+    # Update broker in database
+    success = update_broker(username, broker)
+    if success:
+        # Update session
+        session['broker'] = broker
+        flash('Broker updated successfully', 'success')
+    else:
+        flash('Failed to update broker', 'error')
+        
+    return redirect(url_for('auth.profile'))

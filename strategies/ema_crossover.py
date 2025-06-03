@@ -1,26 +1,45 @@
 from openalgo import api
+import requests
 import pandas as pd
 import numpy as np
 import time
 import threading
 from datetime import datetime, timedelta
+import traceback
+import sys
+import logging
+import warnings
 
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+
+logger = logging.getLogger(__name__)
 # Get API key from openalgo portal
 api_key = '92fbae88ad9c469aa53b96c4f1e0b2db3341c06bc6c80303092687fc78741abe'
 
 # Set the strategy details and trading parameters
 strategy = "EMA Crossover Python"
-symbol = "BHEL"  # OpenAlgo Symbol
+symbols = ["BHEL", "SBIN", "RELIANCE"]  # List of OpenAlgo Symbols
 exchange = "NSE"
 product = "MIS"
 quantity = 1
+
+# Global dictionary to track positions for each symbol
+symbol_positions = {symbol: 0 for symbol in symbols}
+
+# Global dictionary to track the last order timestamp for each symbol
+last_order_time = {symbol: None for symbol in symbols}
+order_interval_seconds = 60 * 5  # 5 minutes between orders
 
 # EMA periods
 fast_period = 5
 slow_period = 10
 
 # Set the API Key
-client = api(api_key=api_key, host='http://127.0.0.1:5000')
+client = api(api_key=api_key, host='https://804c-83-92-100-2.ngrok-free.app')
 
 def calculate_ema_signals(df):
     """
@@ -55,50 +74,38 @@ def calculate_ema_signals(df):
         'Crossunder': crossunder
     }, index=df.index)
 
-def ema_strategy():
+def ema_strategy(symbol):
     """
-    The EMA crossover trading strategy.
+    EMA crossover trading strategy for a single symbol.
     """
-    position = 0
-
     while True:
         try:
-            # Dynamic date range: 7 days back to today
             end_date = datetime.now().strftime("%Y-%m-%d")
             start_date = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
 
-            # Fetch 1-minute historical data using OpenAlgo
             df = client.history(
                 symbol=symbol,
                 exchange=exchange,
-                interval="1m",
+                interval="1h",
                 start_date=start_date,
                 end_date=end_date
             )
 
-            # Check for valid data
             if df.empty:
-                print("DataFrame is empty. Retrying...")
+                print(f"{symbol} - DataFrame is empty. Retrying...")
                 time.sleep(15)
                 continue
 
-            # Verify required columns
             if 'close' not in df.columns:
                 raise KeyError("Missing 'close' column in DataFrame")
 
-            # Round the close column
             df['close'] = df['close'].round(2)
-
-            # Calculate EMAs and signals
             signals = calculate_ema_signals(df)
-
-            # Get latest signals
-            crossover = signals['Crossover'].iloc[-2]  # Using -2 to avoid partial candle
+            crossover = signals['Crossover'].iloc[-2]
             crossunder = signals['Crossunder'].iloc[-2]
 
-            # Execute Buy Order
-            if crossover and position <= 0:
-                position = quantity
+            if crossover and symbol_positions[symbol] <= 0 and (last_order_time[symbol] is None or (datetime.now() - last_order_time[symbol]).total_seconds() > order_interval_seconds):
+                symbol_positions[symbol] = quantity
                 response = client.placesmartorder(
                     strategy=strategy,
                     symbol=symbol,
@@ -107,13 +114,14 @@ def ema_strategy():
                     price_type="MARKET",
                     product=product,
                     quantity=quantity,
-                    position_size=position
+                    position_size=symbol_positions[symbol]
                 )
-                print("Buy Order Response:", response)
+                print(f"{symbol} - Buy Order Response:", response)
+                last_order_time[symbol] = datetime.now()
+                requests.post(f"http://804c-83-92-100-2.ngrok-free.app/strategy/webhook/YOUR_WEBHOOK_ID", json={"symbol": symbol, "action": "BUY"})
 
-            # Execute Sell Order
-            elif crossunder and position >= 0:
-                position = quantity * -1
+            elif crossunder and symbol_positions[symbol] > 0 and (last_order_time[symbol] is None or (datetime.now() - last_order_time[symbol]).total_seconds() > order_interval_seconds):
+                symbol_positions[symbol] = 0
                 response = client.placesmartorder(
                     strategy=strategy,
                     symbol=symbol,
@@ -122,14 +130,15 @@ def ema_strategy():
                     price_type="MARKET",
                     product=product,
                     quantity=quantity,
-                    position_size=position
+                    position_size=symbol_positions[symbol]
                 )
-                print("Sell Order Response:", response)
+                print(f"{symbol} - Sell Order Response:", response)
+                last_order_time[symbol] = datetime.now()
+                requests.post(f"http://804c-83-92-100-2.ngrok-free.app/strategy/webhook/f8f9ba1e-3144-4797-a140-bcfd5cd9ba3d", json={"symbol": symbol, "action": "SELL"})
 
-            # Log strategy information
-            print(f"\nStrategy Status: {time.strftime("%Y-%m-%d %H:%M:%S")}")
+            print(f"\n{symbol} Strategy Status: {time.strftime('%Y-%m-%d %H:%M:%S')}")
             print("-" * 50)
-            print(f"Position: {position}")
+            print(f"Position: {symbol_positions[symbol]}")
             print(f"LTP: {df['close'].iloc[-1]}")
             print(f"Fast EMA ({fast_period}): {signals['EMA_Fast'].iloc[-2]:.2f}")
             print(f"Slow EMA ({slow_period}): {signals['EMA_Slow'].iloc[-2]:.2f}")
@@ -138,13 +147,21 @@ def ema_strategy():
             print("-" * 50)
 
         except Exception as e:
-            print(f"Error in strategy: {str(e)}")
+            logger.error(f"{symbol} - Error in strategy: {str(e)}")
             time.sleep(15)
+            logger.error("Stack trace:", exc_info=True)
+            print(traceback.format_exc())
             continue
 
-        # Wait before the next cycle
-        time.sleep(1)
+        time.sleep(15)
 
 if __name__ == "__main__":
-    print(f"Starting {fast_period}/{slow_period} EMA Crossover Strategy...")
-    ema_strategy()
+    print(f"Starting {fast_period}/{slow_period} EMA Crossover Strategy for multiple symbols...")
+    threads = []
+    for sym in symbols:
+        t = threading.Thread(target=ema_strategy, args=(sym,))
+        t.start()
+        threads.append(t)
+
+    for t in threads:
+        t.join()

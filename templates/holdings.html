@@ -63,6 +63,7 @@
                             <th>Product</th>
                             <th>Profit and Loss</th>
                             <th>PnL Percentage</th>
+                            <th>Action</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -89,6 +90,22 @@
                             </td>
                             <td class="{% if holding.pnlpercent > 0 %}text-success{% elif holding.pnlpercent < 0 %}text-error{% endif %}">
                                 {{ '{:.2f}'.format(holding.pnlpercent) }}%
+                            </td>
+                            <td>
+                                <div class="dropdown dropdown-end">
+                                    <label tabindex="0" class="btn btn-ghost btn-sm">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                                        </svg>
+                                    </label>
+                                    <ul tabindex="0" class="dropdown-content menu menu-compact shadow-lg bg-base-100 rounded-box w-36">
+                                        <li>
+                                            <a class="text-base-content" onclick="exitPosition('{{ position.symbol }}', '{{ position.exchange }}', '{{ position.product }}')">
+                                                <span class="text-sm">Exit</span>
+                                            </a>
+                                        </li>
+                                    </ul>
+                                </div>
                             </td>
                         </tr>
                         {% endfor %}

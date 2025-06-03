@@ -53,6 +53,21 @@
                     </label>
                     <div class="badge badge-primary">Administrator</div>
                 </div>
+                <div class="md:col-span-2">
+                    <label class="label">
+                        <span class="label-text">Default Broker</span>
+                    </label>
+                    <form method="POST" action="{{ url_for('auth.update_broker') }}" class="flex gap-2">
+                        <select name="broker" class="select select-bordered w-full" onchange="this.form.submit()">
+                            <option value="">Select Broker</option>
+                            {% for broker in available_brokers %}
+                            <option value="{{ broker }}" {% if selected_broker == broker %}selected{% endif %}>
+                                {{ broker|upper }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </form>
+                </div>
             </div>
         </div>
     </div>

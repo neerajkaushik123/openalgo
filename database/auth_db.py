@@ -2,6 +2,7 @@
 
 import os
 import base64
+import logging
 from sqlalchemy import create_engine, UniqueConstraint
 from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
@@ -13,6 +14,9 @@ from argon2.exceptions import VerifyMismatchError
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+
+# Initialize logger
+logger = logging.getLogger(__name__)
 
 # Initialize Argon2 hasher
 ph = PasswordHasher()
@@ -275,3 +279,40 @@ def get_auth_token_broker(provided_api_key, include_feed_token=False):
             return (None, None, None) if include_feed_token else (None, None)
     else:
         return (None, None, None) if include_feed_token else (None, None)
+
+def get_user(username):
+    """Get user details from the database"""
+    try:
+        user = db_session.query(User).filter(User.username == username).first()
+        return user
+    except Exception as e:
+        logger.error(f"Error getting user: {e}")
+        return None
+
+def update_broker(username, broker):
+    """Update user's default broker"""
+    try:
+        user = db_session.query(User).filter(User.username == username).first()
+        if user:
+            user.broker = broker
+            db_session.commit()
+            return True
+        return False
+    except Exception as e:
+        logger.error(f"Error updating broker: {e}")
+        db_session.rollback()
+        return False
+
+def update_password(username, new_password):
+    """Update user's password"""
+    try:
+        user = db_session.query(User).filter(User.username == username).first()
+        if user:
+            user.set_password(new_password)
+            db_session.commit()
+            return True
+        return False
+    except Exception as e:
+        logger.error(f"Error updating password: {e}")
+        db_session.rollback()
+        return False

@@ -202,13 +202,20 @@ def transform_positions_data(positions_data):
 def transform_holdings_data(holdings_data):
     transformed_data = []
     for holdings in holdings_data:
+        # print(f"checking holdings {holdings['tradingsymbol']}")
+        avg_price = holdings.get('average_price', 0)
+        if avg_price == 0:
+            pnl_percent = 0
+        else:
+            pnl_percent = round((holdings.get('last_price', 0) - holdings.get('average_price', 0.0)) / holdings.get('average_price', 0.0) * 100, 2)
+
         transformed_position = {
             "symbol": holdings.get('tradingsymbol', ''),
             "exchange": holdings.get('exchange', ''),
-            "quantity": holdings.get('quantity', 0),
+            "quantity": holdings.get('quantity', 0) + holdings.get('t1_quantity', 0),
             "product": holdings.get('product', ''),
             "pnl": round(holdings.get('pnl', 0.0), 2),  # Rounded to two decimals
-            "pnlpercent": round((holdings.get('last_price', 0) - holdings.get('average_price', 0.0)) / holdings.get('average_price', 0.0) * 100, 2)  # Rounded to two decimals
+            "pnlpercent": pnl_percent
         
         }
         transformed_data.append(transformed_position)

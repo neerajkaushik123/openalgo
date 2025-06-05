@@ -15,6 +15,8 @@ df = client.history(
 # Display the fetched data
 print(df)
 
+
+
 # print(type(df))
 # print(df.shape)
 # print(df.index)

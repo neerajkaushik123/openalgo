@@ -277,12 +277,12 @@ def holdings():
     holdings_data = transform_holdings_data(holdings_data)
     
     # Add portfolio analysis
-    analysis = analyze_holdings(holdings_data)
-    
+    # analysis = analyze_holdings(holdings_data)
+    print(holdings_data)
     return render_template('holdings.html', 
                          holdings_data=holdings_data, 
-                         portfolio_stats=portfolio_stats,
-                         analysis=analysis.get('data', {}) if analysis['status'] == 'success' else {})
+                         portfolio_stats=portfolio_stats
+                         )
 
 @orders_bp.route('/orderbook/export')
 @check_session_validity

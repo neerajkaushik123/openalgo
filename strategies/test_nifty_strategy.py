@@ -18,7 +18,7 @@ def get_nifty_data():
     start_date = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
 
     df = client.history(
-                    symbol="FINNIFTY", #NIFTY
+                    symbol="NIFTY", #NIFTY
                     exchange="NSE_INDEX",
                     interval="30m",
                     start_date=start_date,

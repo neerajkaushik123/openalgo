@@ -541,3 +541,50 @@ def close_all_positions():
             'status': 'error',
             'message': f'An error occurred: {str(e)}'
         }), 500
+
+@orders_bp.route('/watchlist')
+@check_session_validity
+def watchlist():
+    return render_template('watchlist.html')
+
+@orders_bp.route('/api/search_symbol', methods=['POST'])
+@check_session_validity
+def search_symbol():
+    data = request.get_json()
+    search_term = data.get('search_term', '')
+    
+    # Call your broker's search API here
+    # This is a placeholder - replace with actual broker API call
+    search_results = []  # Replace with actual search results
+    
+    return jsonify(search_results)
+
+@orders_bp.route('/api/add_to_watchlist', methods=['POST'])
+@check_session_validity
+def add_to_watchlist():
+    data = request.get_json()
+    symbol = data.get('symbol')
+    exchange = data.get('exchange')
+    
+    # Add to watchlist in database
+    # This is a placeholder - implement actual database storage
+    return jsonify({'status': 'success'})
+
+@orders_bp.route('/api/get_watchlist', methods=['GET'])
+@check_session_validity
+def get_watchlist():
+    # Get watchlist from database
+    # This is a placeholder - implement actual database retrieval
+    watchlist = []  # Replace with actual watchlist data
+    return jsonify(watchlist)
+
+@orders_bp.route('/api/remove_from_watchlist', methods=['POST'])
+@check_session_validity
+def remove_from_watchlist():
+    data = request.get_json()
+    symbol = data.get('symbol')
+    exchange = data.get('exchange')
+    
+    # Remove from watchlist in database
+    # This is a placeholder - implement actual database removal
+    return jsonify({'status': 'success'})

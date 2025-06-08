@@ -19,10 +19,10 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 # Get API key from openalgo portal
 api_key = '92fbae88ad9c469aa53b96c4f1e0b2db3341c06bc6c80303092687fc78741abe'
-
+demoMode = True
 # Set the strategy details and trading parameters
 strategy = "EMA Crossover Python"
-symbols = ["BHEL", "SBIN", "RELIANCE"]  # List of OpenAlgo Symbols
+symbols = ["BHEL", "SBIN", "RELIANCE", "BEL","BSE","MCS","ICICIBANK","NCC"]
 exchange = "NSE"
 product = "MIS"
 quantity = 1
@@ -106,35 +106,45 @@ def ema_strategy(symbol):
 
             if crossover and symbol_positions[symbol] <= 0 and (last_order_time[symbol] is None or (datetime.now() - last_order_time[symbol]).total_seconds() > order_interval_seconds):
                 symbol_positions[symbol] = quantity
-                response = client.placesmartorder(
-                    strategy=strategy,
-                    symbol=symbol,
-                    action="BUY",
-                    exchange=exchange,
-                    price_type="MARKET",
-                    product=product,
-                    quantity=quantity,
-                    position_size=symbol_positions[symbol]
-                )
-                print(f"{symbol} - Buy Order Response:", response)
-                last_order_time[symbol] = datetime.now()
-                requests.post(f"http://804c-83-92-100-2.ngrok-free.app/strategy/webhook/YOUR_WEBHOOK_ID", json={"symbol": symbol, "action": "BUY"})
+                if demoMode:
+                    print(f"{symbol} - Buy Order Response: Demo Mode {symbol_positions[symbol]},BUY,{exchange},{product},{quantity}")
+                    last_order_time[symbol] = datetime.now()
+                    continue
+                else:
+                    response = client.placesmartorder(
+                        strategy=strategy,
+                        symbol=symbol,
+                        action="BUY",
+                        exchange=exchange,
+                        price_type="MARKET",
+                        product=product,
+                        quantity=quantity,
+                        position_size=symbol_positions[symbol]
+                    )
+                    print(f"{symbol} - Buy Order Response:", response)
+                    last_order_time[symbol] = datetime.now()
+                # requests.post(f"http://804c-83-92-100-2.ngrok-free.app/strategy/webhook/YOUR_WEBHOOK_ID", json={"symbol": symbol, "action": "BUY"})
 
             elif crossunder and symbol_positions[symbol] > 0 and (last_order_time[symbol] is None or (datetime.now() - last_order_time[symbol]).total_seconds() > order_interval_seconds):
                 symbol_positions[symbol] = 0
-                response = client.placesmartorder(
-                    strategy=strategy,
-                    symbol=symbol,
-                    action="SELL",
-                    exchange=exchange,
-                    price_type="MARKET",
-                    product=product,
-                    quantity=quantity,
-                    position_size=symbol_positions[symbol]
-                )
-                print(f"{symbol} - Sell Order Response:", response)
-                last_order_time[symbol] = datetime.now()
-                requests.post(f"http://804c-83-92-100-2.ngrok-free.app/strategy/webhook/f8f9ba1e-3144-4797-a140-bcfd5cd9ba3d", json={"symbol": symbol, "action": "SELL"})
+                if demoMode:
+                    print(f"{symbol} - Sell Order Response: Demo Mode {symbol_positions[symbol]},SELL,{exchange},{product},{quantity}")
+                    last_order_time[symbol] = datetime.now()
+                    continue
+                else:
+                    response = client.placesmartorder(
+                        strategy=strategy,
+                        symbol=symbol,
+                        action="SELL",
+                        exchange=exchange,
+                        price_type="MARKET",
+                        product=product,
+                        quantity=quantity,
+                        position_size=symbol_positions[symbol]
+                    )
+                    print(f"{symbol} - Sell Order Response:", response)
+                    last_order_time[symbol] = datetime.now()
+                    # requests.post(f"http://804c-83-92-100-2.ngrok-free.app/strategy/webhook/f8f9ba1e-3144-4797-a140-bcfd5cd9ba3d", json={"symbol": symbol, "action": "SELL"})
 
             print(f"\n{symbol} Strategy Status: {time.strftime('%Y-%m-%d %H:%M:%S')}")
             print("-" * 50)

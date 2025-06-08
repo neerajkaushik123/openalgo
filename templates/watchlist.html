@@ -1,0 +1,278 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="w-full">
+    <!-- Header -->
+    <div class="section-header">
+        <h1 class="text-2xl font-semibold text-base-content">Watchlist</h1>
+    </div>
+
+    <!-- Search and Add Section -->
+    <div class="card bg-base-100 shadow-lg mb-6">
+        <div class="card-body">
+            <div class="flex flex-col md:flex-row gap-4">
+                <div class="flex-1">
+                    <div class="form-control">
+                        <div class="input-group">
+                            <input type="text" id="symbolSearch" placeholder="Search symbol..." class="input input-bordered w-full" />
+                            <button class="btn btn-square" onclick="searchSymbol()">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex-none">
+                    <select id="exchangeSelect" class="select select-bordered w-full">
+                        <option value="NSE">NSE</option>
+                        <option value="BSE">BSE</option>
+                        <option value="NFO">NFO</option>
+                        <option value="MCX">MCX</option>
+                    </select>
+                </div>
+            </div>
+            <!-- Search Results -->
+            <div id="searchResults" class="mt-4 hidden">
+                <div class="overflow-x-auto">
+                    <table class="table w-full">
+                        <thead>
+                            <tr>
+                                <th>Symbol</th>
+                                <th>Exchange</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="searchResultsBody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Watchlist Table -->
+    <div class="card bg-base-100 shadow-lg">
+        <div class="card-body">
+            <div class="overflow-x-auto">
+                <table class="table w-full">
+                    <thead>
+                        <tr>
+                            <th>Symbol</th>
+                            <th>Exchange</th>
+                            <th>LTP</th>
+                            <th>Change</th>
+                            <th>Change %</th>
+                            <th>Volume</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="watchlistBody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+let ws = null;
+let watchlist = new Set();
+
+function connectWebSocket() {
+    ws = new WebSocket('ws://127.0.0.1:8765');
+    
+    ws.onopen = function() {
+        console.log('WebSocket Connected');
+        // Subscribe to quotes for watchlist items
+        if (watchlist.size > 0) {
+            const instruments = Array.from(watchlist).map(item => ({
+                exchange: item.exchange,
+                symbol: item.symbol
+            }));
+            ws.send(JSON.stringify({
+                type: 'subscribe_quote',
+                instruments: instruments
+            }));
+        }
+    };
+    
+    ws.onmessage = function(event) {
+        const data = JSON.parse(event.data);
+        updateQuote(data);
+    };
+    
+    ws.onclose = function() {
+        console.log('WebSocket Disconnected');
+        // Attempt to reconnect after 5 seconds
+        setTimeout(connectWebSocket, 5000);
+    };
+}
+
+function updateQuote(data) {
+    const row = document.querySelector(`tr[data-symbol="${data.symbol}"][data-exchange="${data.exchange}"]`);
+    if (row) {
+        row.querySelector('.ltp').textContent = data.ltp;
+        row.querySelector('.change').textContent = data.change;
+        row.querySelector('.change-percent').textContent = `${data.change_percent}%`;
+        row.querySelector('.volume').textContent = data.volume;
+        
+        // Update colors based on change
+        const changeClass = data.change >= 0 ? 'text-success' : 'text-error';
+        row.querySelector('.change').className = `change ${changeClass}`;
+        row.querySelector('.change-percent').className = `change-percent ${changeClass}`;
+    }
+}
+
+async function searchSymbol() {
+    const searchTerm = document.getElementById('symbolSearch').value;
+    const exchange = document.getElementById('exchangeSelect').value;
+    
+    try {
+        const response = await fetch('/api/search_symbol', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                search_term: searchTerm,
+                exchange: exchange
+            })
+        });
+        
+        const results = await response.json();
+        displaySearchResults(results);
+    } catch (error) {
+        console.error('Error searching symbols:', error);
+    }
+}
+
+function displaySearchResults(results) {
+    const resultsDiv = document.getElementById('searchResults');
+    const resultsBody = document.getElementById('searchResultsBody');
+    resultsBody.innerHTML = '';
+    
+    results.forEach(result => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${result.symbol}</td>
+            <td>${result.exchange}</td>
+            <td>
+                <button class="btn btn-sm btn-primary" onclick="addToWatchlist('${result.symbol}', '${result.exchange}')">
+                    Add
+                </button>
+            </td>
+        `;
+        resultsBody.appendChild(row);
+    });
+    
+    resultsDiv.classList.remove('hidden');
+}
+
+async function addToWatchlist(symbol, exchange) {
+    try {
+        const response = await fetch('/api/add_to_watchlist', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                symbol: symbol,
+                exchange: exchange
+            })
+        });
+        
+        const result = await response.json();
+        if (result.status === 'success') {
+            watchlist.add({ symbol, exchange });
+            updateWatchlistTable();
+            
+            // Subscribe to new symbol
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'subscribe_quote',
+                    instruments: [{ exchange, symbol }]
+                }));
+            }
+        }
+    } catch (error) {
+        console.error('Error adding to watchlist:', error);
+    }
+}
+
+function updateWatchlistTable() {
+    const watchlistBody = document.getElementById('watchlistBody');
+    watchlistBody.innerHTML = '';
+    
+    watchlist.forEach(item => {
+        const row = document.createElement('tr');
+        row.setAttribute('data-symbol', item.symbol);
+        row.setAttribute('data-exchange', item.exchange);
+        row.innerHTML = `
+            <td>${item.symbol}</td>
+            <td>${item.exchange}</td>
+            <td class="ltp">-</td>
+            <td class="change">-</td>
+            <td class="change-percent">-</td>
+            <td class="volume">-</td>
+            <td>
+                <button class="btn btn-sm btn-error" onclick="removeFromWatchlist('${item.symbol}', '${item.exchange}')">
+                    Remove
+                </button>
+            </td>
+        `;
+        watchlistBody.appendChild(row);
+    });
+}
+
+async function removeFromWatchlist(symbol, exchange) {
+    try {
+        const response = await fetch('/api/remove_from_watchlist', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                symbol: symbol,
+                exchange: exchange
+            })
+        });
+        
+        const result = await response.json();
+        if (result.status === 'success') {
+            watchlist.delete({ symbol, exchange });
+            updateWatchlistTable();
+            
+            // Unsubscribe from symbol
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'unsubscribe_quote',
+                    instruments: [{ exchange, symbol }]
+                }));
+            }
+        }
+    } catch (error) {
+        console.error('Error removing from watchlist:', error);
+    }
+}
+
+// Initialize
+document.addEventListener('DOMContentLoaded', async function() {
+    // Load existing watchlist
+    try {
+        const response = await fetch('/api/get_watchlist');
+        const data = await response.json();
+        watchlist = new Set(data.map(item => ({ symbol: item.symbol, exchange: item.exchange })));
+        updateWatchlistTable();
+    } catch (error) {
+        console.error('Error loading watchlist:', error);
+    }
+    
+    // Connect WebSocket
+    connectWebSocket();
+});
+</script>
+{% endblock %} 

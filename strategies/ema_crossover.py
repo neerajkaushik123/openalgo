@@ -158,12 +158,12 @@ def ema_strategy(symbol):
 
         except Exception as e:
             logger.error(f"{symbol} - Error in strategy: {str(e)}")
-            time.sleep(15)
+            time.sleep(30)
             logger.error("Stack trace:", exc_info=True)
             print(traceback.format_exc())
             continue
 
-        time.sleep(15)
+        time.sleep(30)
 
 if __name__ == "__main__":
     print(f"Starting {fast_period}/{slow_period} EMA Crossover Strategy for multiple symbols...")

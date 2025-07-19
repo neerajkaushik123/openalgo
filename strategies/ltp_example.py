@@ -7,7 +7,7 @@ import time
 
 # Initialize feed client with explicit parameters
 client = api(
-    api_key="92fbae88ad9c469aa53b96c4f1e0b2db3341c06bc6c80303092687fc78741abe",  # Replace with your API key
+    api_key="e07835e0b2f2a765964ee4e6c2f741ada6f96ffa26211774026a368105482b4c",  # Replace with your API key
     host="http://127.0.0.1:5000",  # Replace with your API host
     ws_url="ws://127.0.0.1:8765"  # Explicit WebSocket URL (can be different from REST API host)
 )
@@ -16,7 +16,8 @@ client = api(
 instruments_list = [
     {"exchange": "MCX", "symbol": "GOLD05AUG25FUT"},
     {"exchange": "MCX", "symbol": "CRUDEOIL19AUG25FUT"},
-    {"exchange": "NSEINDEX", "symbol": "NIFTY50"}
+    {"exchange": "NSEINDEX", "symbol": "NIFTY50"},
+    {"exchange": "NSE", "symbol": "TCS"}
 ]
 
 def on_data_received(data):

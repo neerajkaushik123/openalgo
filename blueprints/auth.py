@@ -2,12 +2,15 @@ from flask import Blueprint, request, redirect, url_for, render_template, sessio
 from limiter import limiter  # Import the limiter instance
 from extensions import socketio
 import os
-from database.auth_db import upsert_auth, get_user, update_password, update_broker
+from database.auth_db import upsert_auth
 from database.user_db import authenticate_user, User, db_session, find_user_by_username, find_user_by_email  # Import the function
 import re
 from utils.session import check_session_validity
 import secrets
-import logging
+from utils.logging import get_logger
+
+# Initialize logger
+logger = get_logger(__name__)
 
 # Access environment variables
 LOGIN_RATE_LIMIT_MIN = os.getenv("LOGIN_RATE_LIMIT_MIN", "5 per minute")
@@ -41,7 +44,7 @@ def login():
         
         if authenticate_user(username, password):
             session['user'] = username  # Set the username in the session
-            print("login success")
+            logger.info(f"Login success for user: {username}")
             # Redirect to broker login without marking as fully logged in
             return jsonify({'status': 'success'}), 200
         else:
@@ -62,10 +65,15 @@ def broker_login():
         BROKER_API_SECRET = os.getenv('BROKER_API_SECRET')
         REDIRECT_URL = os.getenv('REDIRECT_URL')
         broker_name = re.search(r'/([^/]+)/callback$', REDIRECT_URL).group(1)
+        
+        # Import mask function for credential security
+        from utils.auth_utils import mask_api_credential
             
         return render_template('broker.html', 
-                             broker_api_key=BROKER_API_KEY, 
-                             broker_api_secret=BROKER_API_SECRET,
+                             broker_api_key=BROKER_API_KEY,  # Keep original for OAuth redirects
+                             broker_api_key_masked=mask_api_credential(BROKER_API_KEY),
+                             broker_api_secret=BROKER_API_SECRET,  # Keep original for OAuth redirects  
+                             broker_api_secret_masked=mask_api_credential(BROKER_API_SECRET),
                              redirect_url=REDIRECT_URL,
                              broker_name=broker_name)
 
@@ -81,15 +89,15 @@ def reset_password():
         email = request.form.get('email')
         user = find_user_by_email(email)
         
+        # Always show the same response to prevent user enumeration
         if user:
             session['reset_email'] = email
-            return render_template('reset_password.html', 
-                                 email_sent=True, 
-                                 totp_verified=False,
-                                 email=email)
-        else:
-            flash('No account found with that email address.', 'error')
-            return render_template('reset_password.html', email_sent=False)
+        
+        # Show success message regardless of whether email exists
+        return render_template('reset_password.html', 
+                             email_sent=True, 
+                             totp_verified=False,
+                             email=email)
             
     elif step == 'totp':
         email = request.form.get('email')
@@ -129,9 +137,10 @@ def reset_password():
             user.set_password(password)
             db_session.commit()
             
-            # Clear reset session data
+            # Clear reset session data and regenerate session ID for security
             session.pop('reset_token', None)
             session.pop('reset_email', None)
+            session.regenerate()
             
             flash('Your password has been reset successfully.', 'success')
             return redirect(url_for('auth.login'))
@@ -175,9 +184,7 @@ def change_password():
 
     return render_template('profile.html', username=session['user'])
 
-@auth_bp.route('/logout', methods=['POST'])
-@limiter.limit(LOGIN_RATE_LIMIT_MIN)
-@limiter.limit(LOGIN_RATE_LIMIT_HOUR)
+@auth_bp.route('/logout', methods=['GET', 'POST'])
 def logout():
     if session.get('logged_in'):
         username = session['user']
@@ -185,10 +192,10 @@ def logout():
         #writing to database      
         inserted_id = upsert_auth(username, "", "", revoke=True)
         if inserted_id is not None:
-            print(f"Database Upserted record with ID: {inserted_id}")
-            print(f'Auth Revoked in the Database')
+            logger.info(f"Database Upserted record with ID: {inserted_id}")
+            logger.info(f'Auth Revoked in the Database for user: {username}')
         else:
-            print("Failed to upsert auth token")
+            logger.error(f"Failed to upsert auth token for user: {username}")
         
         # Remove tokens and user information from session
         session.pop('user', None)  # Remove 'user' from session if exists
@@ -197,49 +204,3 @@ def logout():
 
     # Redirect to login page after logout
     return redirect(url_for('auth.login'))
-
-# Get list of available brokers
-def get_available_brokers():
-    broker_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'broker')
-    return [d for d in os.listdir(broker_dir) 
-            if os.path.isdir(os.path.join(broker_dir, d)) 
-            and not d.startswith('__')]
-
-@auth_bp.route('/profile')
-@check_session_validity
-def profile():
-    username = session.get('user')
-    if not username:
-        return redirect(url_for('auth.login'))
-        
-    user = get_user(username)
-    if not user:
-        return redirect(url_for('auth.login'))
-        
-    return render_template('profile.html',
-                         username=username,
-                         available_brokers=get_available_brokers(),
-                         selected_broker=session.get('broker'))
-
-@auth_bp.route('/update_broker', methods=['POST'])
-@check_session_validity
-def update_broker():
-    username = session.get('user')
-    if not username:
-        return redirect(url_for('auth.login'))
-        
-    broker = request.form.get('broker')
-    if not broker:
-        flash('Please select a broker', 'error')
-        return redirect(url_for('auth.profile'))
-        
-    # Update broker in database
-    success = update_broker(username, broker)
-    if success:
-        # Update session
-        session['broker'] = broker
-        flash('Broker updated successfully', 'success')
-    else:
-        flash('Failed to update broker', 'error')
-        
-    return redirect(url_for('auth.profile'))

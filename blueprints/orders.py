@@ -4,12 +4,12 @@ from database.auth_db import get_auth_token
 from utils.session import check_session_validity
 from services.place_smart_order_service import place_smart_order
 from services.close_position_service import close_position
-import logging
+from utils.logging import get_logger
 import csv
 import io
 from services.holdings_service import analyze_holdings
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Define the blueprint
 orders_bp = Blueprint('orders_bp', __name__, url_prefix='/')
@@ -468,20 +468,24 @@ def close_position():
         # Call the broker API directly
         res, response, orderid = place_smartorder_api(order_data, auth_token)
         
-        # Format the response
-        if response.get('status') == 'success':
+        # Format the response based on presence of orderid and broker's response
+        if orderid:
             response_data = {
                 'status': 'success',
-                'message': 'Position closed successfully',
+                'message': response.get('message') if response and 'message' in response else 'Position close order placed successfully.',
                 'orderid': orderid
             }
             status_code = 200
         else:
+            # No orderid, definite error
             response_data = {
                 'status': 'error',
-                'message': response.get('message', 'Failed to close position')
+                'message': response.get('message') if response and 'message' in response else 'Failed to close position (broker did not return order ID).'
             }
-            status_code = res.status if res and hasattr(res, 'status') else 400
+            if res and hasattr(res, 'status') and isinstance(res.status, int) and res.status >= 400:
+                status_code = res.status  # Use broker's HTTP error code if available
+            else:
+                status_code = 400 # Default to Bad Request
         
         return jsonify(response_data), status_code
         
@@ -542,49 +546,58 @@ def close_all_positions():
             'message': f'An error occurred: {str(e)}'
         }), 500
 
-@orders_bp.route('/watchlist')
+@orders_bp.route('/cancel_all_orders', methods=['POST'])
 @check_session_validity
-def watchlist():
-    return render_template('watchlist.html')
-
-@orders_bp.route('/api/search_symbol', methods=['POST'])
-@check_session_validity
-def search_symbol():
-    data = request.get_json()
-    search_term = data.get('search_term', '')
-    
-    # Call your broker's search API here
-    # This is a placeholder - replace with actual broker API call
-    search_results = []  # Replace with actual search results
-    
-    return jsonify(search_results)
-
-@orders_bp.route('/api/add_to_watchlist', methods=['POST'])
-@check_session_validity
-def add_to_watchlist():
-    data = request.get_json()
-    symbol = data.get('symbol')
-    exchange = data.get('exchange')
-    
-    # Add to watchlist in database
-    # This is a placeholder - implement actual database storage
-    return jsonify({'status': 'success'})
-
-@orders_bp.route('/api/get_watchlist', methods=['GET'])
-@check_session_validity
-def get_watchlist():
-    # Get watchlist from database
-    # This is a placeholder - implement actual database retrieval
-    watchlist = []  # Replace with actual watchlist data
-    return jsonify(watchlist)
-
-@orders_bp.route('/api/remove_from_watchlist', methods=['POST'])
-@check_session_validity
-def remove_from_watchlist():
-    data = request.get_json()
-    symbol = data.get('symbol')
-    exchange = data.get('exchange')
-    
-    # Remove from watchlist in database
-    # This is a placeholder - implement actual database removal
-    return jsonify({'status': 'success'})
+def cancel_all_orders_ui():
+    """Cancel all open orders using the broker API from UI"""
+    try:
+        # Get auth token from session
+        login_username = session['user']
+        auth_token = get_auth_token(login_username)
+        broker_name = session.get('broker')
+        
+        if not auth_token or not broker_name:
+            return jsonify({
+                'status': 'error',
+                'message': 'Authentication error'
+            }), 401
+        
+        # Import the cancel_all_orders service
+        from services.cancel_all_order_service import cancel_all_orders
+        
+        # Call the service with auth_token and broker
+        success, response_data, status_code = cancel_all_orders(
+            order_data={},
+            auth_token=auth_token,
+            broker=broker_name
+        )
+        
+        # Format the response for UI
+        if success and status_code == 200:
+            canceled_count = len(response_data.get('canceled_orders', []))
+            failed_count = len(response_data.get('failed_cancellations', []))
+            
+            if canceled_count > 0 or failed_count == 0:
+                message = f'Successfully canceled {canceled_count} orders'
+                if failed_count > 0:
+                    message += f' (Failed to cancel {failed_count} orders)'
+                return jsonify({
+                    'status': 'success',
+                    'message': message,
+                    'canceled_orders': response_data.get('canceled_orders', []),
+                    'failed_cancellations': response_data.get('failed_cancellations', [])
+                }), 200
+            else:
+                return jsonify({
+                    'status': 'info',
+                    'message': 'No open orders to cancel'
+                }), 200
+        else:
+            return jsonify(response_data), status_code
+        
+    except Exception as e:
+        logger.error(f"Error in cancel_all_orders_ui endpoint: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': f'An error occurred: {str(e)}'
+        }), 500

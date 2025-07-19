@@ -1,4 +1,3 @@
-import logging
 import traceback
 import copy
 import requests
@@ -9,10 +8,11 @@ from database.apilog_db import async_log_order, executor as log_executor
 from database.settings_db import get_analyze_mode
 from database.analyzer_db import async_log_analyzer
 from extensions import socketio
+from utils.logging import get_logger
+from utils.config import get_host_server
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Initialize logger
+logger = get_logger(__name__)
 
 def emit_analyzer_error(request_data: Dict[str, Any], error_message: str) -> Dict[str, Any]:
     """
@@ -116,8 +116,9 @@ def get_order_status_with_auth(
         # Prepare orderbook request with just apikey
         orderbook_request = {'apikey': status_data.get('apikey')}
         
-        # Make request to orderbook API
-        orderbook_response = requests.post('http://127.0.0.1:5000/api/v1/orderbook', json=orderbook_request)
+        # Make request to orderbook API using HOST_SERVER from config
+        host_server = get_host_server()
+        orderbook_response = requests.post(f'{host_server}/api/v1/orderbook', json=orderbook_request)
         
         if orderbook_response.status_code != 200:
             error_response = {
